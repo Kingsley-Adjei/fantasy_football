@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import { COLORS } from "../../src/constants/colors";
 import { validateEmail } from "../../src/utils/validation";
@@ -55,18 +56,48 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await authService.sendOTP(email);
+      const response = await fetch(
+        "http://192.168.XXX.XXX:8082/api/auth/initiate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email,
+            password: password,
+          }),
+        }
+      );
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const data = await response.json();
+      console.log("DEBUG: Received message is ->", data.message); // ADD THIS
 
-      // ✅ Navigate to OTP screen with email parameter
-      router.push({
-        pathname: "/(auth)/verify-otp",
-        params: { email },
-      });
+      if (response.ok) {
+        // Use .trim() just in case there's a hidden space from the Java string
+        if (data.message && data.message.trim() === "NEW_USER_OTP_SENT") {
+          console.log("About to navigate...");
+          router.push({
+            pathname: "/(auth)/verify-otp",
+            params: { email: email },
+          });
+        } else if (data.message === "LOGIN_SUCCESS") {
+          console.log("JWT Token received for returning user");
+
+          // Save the token immediately
+          if (data.token) {
+            await SecureStore.setItemAsync("userToken", data.token);
+          }
+
+          // Use replace so they can't "Go Back" to the login screen
+          router.replace("/create-team");
+        }
+      } else {
+        alert(data.error || "Authentication failed");
+      }
     } catch (error) {
-      console.error("Authentication error:", error);
+      console.error("Network Error:", error);
+      alert("Cannot connect to server. Check IP and Wi-Fi.");
     } finally {
       setLoading(false);
     }

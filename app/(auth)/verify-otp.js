@@ -12,17 +12,6 @@ import { COLORS } from "../../src/constants/colors";
 import OTPInput from "../../src/components/ui/OTPInput";
 import CustomButton from "../../src/components/ui/CustomButton";
 
-/**
- * OTP Verification Screen
- * Allows user to enter 6-digit code sent to their email
- *
- * Features:
- * - Auto-focus on mount
- * - Smooth animations
- * - Resend OTP functionality
- * - Timer countdown
- * - Error handling
- */
 export default function VerifyOTPScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams();
@@ -86,6 +75,10 @@ export default function VerifyOTPScreen() {
     ]).start();
   };
 
+  const handleBack = () => {
+    router.back();
+  };
+
   /**
    * Handles OTP completion (when 6 digits entered)
    */
@@ -94,27 +87,40 @@ export default function VerifyOTPScreen() {
     setError(false);
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await authService.verifyOTP(email, code);
+      // 1. THE REAL API CALL
+      const response = await fetch(
+        "http://192.168.XXX.XXX:8082/api/auth/verify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email, // This comes from useLocalSearchParams()
+            otp: code,
+          }),
+        }
+      );
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const data = await response.json();
 
-      // Simulate success/failure (remove this in production)
-      const isValid = code === "123456"; // For demo purposes
+      if (response.ok) {
+        // 2. SUCCESS - Save JWT and move to app
+        console.log("Verification successful! JWT:", data.token);
 
-      if (isValid) {
-        // ✅ Success - Navigate to main app
-        router.replace("/(tabs)");
+        // OPTIONAL: Store token locally
+        if (response.ok) {
+          await SecureStore.setItemAsync("userToken", data.token); // Saves to phone memory
+        }
+        // ✅ Navigate to main app
+        router.replace("/create-team");
       } else {
-        // ❌ Error - Show error state
+        // 3. BACKEND ERROR (Invalid/Expired OTP)
         setError(true);
         setOTP("");
-        triggerShake();
+        if (triggerShake) triggerShake();
 
         Alert.alert(
           "Invalid Code",
-          "The code you entered is incorrect. Please try again.",
+          data.error || "The code you entered is incorrect or expired.",
           [{ text: "OK" }]
         );
       }
@@ -122,43 +128,45 @@ export default function VerifyOTPScreen() {
       console.error("OTP verification error:", error);
       setError(true);
       setOTP("");
-      triggerShake();
+      if (triggerShake) triggerShake();
+      Alert.alert("Connection Error", "Could not reach the server.");
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * Handles resend OTP
+   * Handles resend OTP (Uses your existing initiate endpoint)
    */
   const handleResend = async () => {
     if (!canResend) return;
 
     try {
-      // TODO: Replace with actual API call
-      // await authService.resendOTP(email);
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setResendTimer(60);
-      setCanResend(false);
-      setOTP("");
-
-      Alert.alert(
-        "Code Sent",
-        "A new verification code has been sent to your email.",
-        [{ text: "OK" }]
+      // We use the same 'initiate' endpoint because it handles resending
+      const response = await fetch(
+        "http://192.168.XXX.XXX:8082/api/auth/initiate",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email, password: "" }), // Password can be empty here if your backend handles it
+        }
       );
+
+      if (response.ok) {
+        setResendTimer(60);
+        setCanResend(false);
+        setOTP("");
+
+        Alert.alert(
+          "Code Sent",
+          "A new verification code has been sent to your email.",
+          [{ text: "OK" }]
+        );
+      }
     } catch (error) {
       console.error("Resend error:", error);
+      Alert.alert("Error", "Failed to resend code.");
     }
-  };
-
-  /**
-   * Handles back navigation
-   */
-  const handleBack = () => {
-    router.back();
   };
 
   // Format email for display (mask middle part)

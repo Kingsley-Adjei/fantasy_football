@@ -2,28 +2,27 @@ import { useEffect } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { COLORS } from "../src/constants/colors";
+import * as SecureStore from "expo-secure-store"; // 1. Add this import
 
-/**
- * Entry Point / Splash Screen
- * Checks auth status and redirects
- */
 export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check authentication status
     const checkAuth = async () => {
-      // TODO: Replace with actual auth check
-      const isAuthenticated = false;
+      try {
+        const token = await SecureStore.getItemAsync("userToken");
 
-      // Simulate loading
-      setTimeout(() => {
-        if (isAuthenticated) {
-          router.replace("/(tabs)");
-        } else {
-          router.replace("/(auth)/login");
-        }
-      }, 2000);
+        setTimeout(() => {
+          if (token) {
+            router.replace("/(tabs)");
+          } else {
+            router.replace("/(auth)/login");
+          }
+        }, 2000);
+      } catch (error) {
+        console.error("Auth check failed", error);
+        router.replace("/(auth)/login");
+      }
     };
 
     checkAuth();
