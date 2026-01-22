@@ -7,16 +7,16 @@ import {
   SafeAreaView,
   Dimensions,
   Alert,
+  ScrollView,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 const MOCK_SQUAD = [
   {
     id: 1,
     name: "Raya",
     position: "GK",
-    price: 5.0,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -25,7 +25,6 @@ const MOCK_SQUAD = [
     id: 2,
     name: "Saliba",
     position: "DEF",
-    price: 6.0,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -34,7 +33,6 @@ const MOCK_SQUAD = [
     id: 3,
     name: "Gabriel",
     position: "DEF",
-    price: 6.0,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -43,7 +41,6 @@ const MOCK_SQUAD = [
     id: 4,
     name: "Van Dijk",
     position: "DEF",
-    price: 6.5,
     realClub: "Liverpool",
     clubColor: "#C8102E",
     nextFixture: "ARS (A)",
@@ -52,7 +49,6 @@ const MOCK_SQUAD = [
     id: 5,
     name: "Udogie",
     position: "DEF",
-    price: 5.0,
     realClub: "Spurs",
     clubColor: "#132257",
     nextFixture: "MCI (H)",
@@ -61,7 +57,6 @@ const MOCK_SQUAD = [
     id: 6,
     name: "Saka",
     position: "MID",
-    price: 8.5,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -70,7 +65,6 @@ const MOCK_SQUAD = [
     id: 7,
     name: "Salah",
     position: "MID",
-    price: 12.5,
     realClub: "Liverpool",
     clubColor: "#C8102E",
     nextFixture: "ARS (A)",
@@ -79,7 +73,6 @@ const MOCK_SQUAD = [
     id: 8,
     name: "Son",
     position: "MID",
-    price: 9.0,
     realClub: "Spurs",
     clubColor: "#132257",
     nextFixture: "MCI (H)",
@@ -88,7 +81,6 @@ const MOCK_SQUAD = [
     id: 9,
     name: "Palmer",
     position: "MID",
-    price: 6.0,
     realClub: "Chelsea",
     clubColor: "#034694",
     nextFixture: "NEW (A)",
@@ -97,7 +89,6 @@ const MOCK_SQUAD = [
     id: 10,
     name: "Haaland",
     position: "FWD",
-    price: 14.0,
     realClub: "Man City",
     clubColor: "#6CABDD",
     nextFixture: "TOT (A)",
@@ -106,17 +97,14 @@ const MOCK_SQUAD = [
     id: 11,
     name: "Watkins",
     position: "FWD",
-    price: 8.0,
     realClub: "Aston Villa",
     clubColor: "#95BFE5",
     nextFixture: "BOU (H)",
   },
-  // Bench
   {
     id: 12,
     name: "Areola",
     position: "GK",
-    price: 4.0,
     realClub: "West Ham",
     clubColor: "#7A263A",
     nextFixture: "MUN (A)",
@@ -125,7 +113,6 @@ const MOCK_SQUAD = [
     id: 13,
     name: "Burn",
     position: "DEF",
-    price: 4.5,
     realClub: "Newcastle",
     clubColor: "#241F20",
     nextFixture: "CHE (H)",
@@ -134,7 +121,6 @@ const MOCK_SQUAD = [
     id: 14,
     name: "Gordon",
     position: "MID",
-    price: 5.5,
     realClub: "Newcastle",
     clubColor: "#241F20",
     nextFixture: "CHE (H)",
@@ -143,7 +129,6 @@ const MOCK_SQUAD = [
     id: 15,
     name: "Archer",
     position: "FWD",
-    price: 4.5,
     realClub: "Sheffield Utd",
     clubColor: "#EE2737",
     nextFixture: "EVE (A)",
@@ -154,6 +139,7 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
   const [squad, setSquad] = useState(selectedPlayers);
   const [captainId, setCaptainId] = useState(10);
   const [selectedForSwap, setSelectedForSwap] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const starters = useMemo(() => squad.slice(0, 11), [squad]);
   const bench = useMemo(() => squad.slice(11, 15), [squad]);
@@ -169,73 +155,70 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
   );
 
   const handlePlayerPress = (player, isBench) => {
-    // 1. Toggle Deselection
     if (selectedForSwap?.id === player.id) {
       setSelectedForSwap(null);
       return;
     }
-
-    // 2. Initial Selection
     if (!selectedForSwap) {
       setSelectedForSwap({ ...player, fromBench: isBench });
       return;
     }
 
-    // 3. EXECUTE SWAP
-    // If we have a pitch player selected and tap a bench player (OR vice versa)
     if (selectedForSwap.fromBench !== isBench) {
-      executePitchToBenchSwap(selectedForSwap, player);
-    }
-    // If we have a bench player selected and tap another bench player (REORDER)
-    else if (
-      selectedForSwap.fromBench &&
-      isBench &&
-      player.position !== "GK" &&
-      selectedForSwap.position !== "GK"
-    ) {
+      executeSwap(selectedForSwap, { ...player, fromBench: isBench });
+    } else if (selectedForSwap.fromBench && isBench) {
+      if (player.position === "GK" || selectedForSwap.position === "GK") {
+        Alert.alert(
+          "Locked Position",
+          "Substitute Goalkeeper must stay in slot 1."
+        );
+        setSelectedForSwap(null);
+        return;
+      }
       executeBenchReorder(selectedForSwap, player);
+    } else {
+      setSelectedForSwap({ ...player, fromBench: isBench });
     }
   };
 
-  const executePitchToBenchSwap = (pitchSide, benchSide) => {
-    // Identify which is which regardless of click order
-    const pPlayer = pitchSide.fromBench ? benchSide : pitchSide;
-    const bPlayer = benchSide.fromBench ? benchSide : pitchSide;
+  const executeSwap = (first, second) => {
+    const pitchP = first.fromBench ? second : first;
+    const benchP = first.fromBench ? first : second;
 
-    // FPL Formation Validation
-    const newStarters = starters.map((p) =>
-      p.id === pPlayer.id ? bPlayer : p
-    );
+    if (
+      (pitchP.position === "GK" || benchP.position === "GK") &&
+      pitchP.position !== benchP.position
+    ) {
+      Alert.alert(
+        "Invalid Swap",
+        "Goalkeepers can only be swapped with Goalkeepers."
+      );
+      setSelectedForSwap(null);
+      return;
+    }
+
+    const newStarters = starters.map((p) => (p.id === pitchP.id ? benchP : p));
     const defCount = newStarters.filter((p) => p.position === "DEF").length;
     const fwdCount = newStarters.filter((p) => p.position === "FWD").length;
-    const gkCount = newStarters.filter((p) => p.position === "GK").length;
 
-    if (gkCount !== 1) {
-      Alert.alert("Error", "Must have 1 Goalkeeper.");
-      return;
-    }
-    if (defCount < 3 || defCount > 5) {
-      Alert.alert("Invalid Formation", "Must have 3-5 Defenders.");
-      return;
-    }
-    if (fwdCount < 1 || fwdCount > 3) {
-      Alert.alert("Invalid Formation", "Must have 1-3 Forwards.");
+    if (defCount < 3 || defCount > 5 || fwdCount < 1 || fwdCount > 3) {
+      Alert.alert(
+        "Invalid Formation",
+        "Formation must be 3-5 DEF and 1-3 FWD."
+      );
+      setSelectedForSwap(null);
       return;
     }
 
     const newSquad = [...squad];
-    const pIdx = squad.findIndex((p) => p.id === pPlayer.id);
-    const bIdx = squad.findIndex((p) => p.id === bPlayer.id);
-
+    const pIdx = squad.findIndex((p) => p.id === pitchP.id);
+    const bIdx = squad.findIndex((p) => p.id === benchP.id);
     [newSquad[pIdx], newSquad[bIdx]] = [newSquad[bIdx], newSquad[pIdx]];
 
-    // CAPTAIN HANDOVER: If the player leaving was captain, move 'C' to the new player
-    if (pPlayer.id === captainId) {
-      setCaptainId(bPlayer.id);
-    }
-
+    if (pitchP.id === captainId) setCaptainId(benchP.id);
     setSquad(newSquad);
     setSelectedForSwap(null);
+    setHasChanges(true);
   };
 
   const executeBenchReorder = (sub1, sub2) => {
@@ -245,51 +228,40 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
     [newSquad[idx1], newSquad[idx2]] = [newSquad[idx2], newSquad[idx1]];
     setSquad(newSquad);
     setSelectedForSwap(null);
+    setHasChanges(true);
   };
 
   const PlayerSlot = ({ player, isBench }) => {
-    if (!player)
-      return (
-        <View style={styles.slot}>
-          <View style={styles.emptyJersey}>
-            <Text style={styles.emptyPlus}>+</Text>
-          </View>
-        </View>
-      );
-
+    if (!player) return null;
     const isCaptain = player.id === captainId;
     const isSelected = selectedForSwap?.id === player.id;
-    const jerseyColor =
-      player.position === "GK" ? "#FFB800" : player.clubColor || "#38003c";
 
     return (
       <TouchableOpacity
-        style={[styles.slot, isSelected && styles.selectedSlot]}
+        style={[styles.playerSlot, isSelected && styles.playerSlotSelected]}
         onPress={() => handlePlayerPress(player, isBench)}
         onLongPress={() => !isBench && setCaptainId(player.id)}
       >
-        <View style={styles.jerseyContainer}>
-          <Text
-            style={{
-              fontSize: 42,
-              color: jerseyColor,
-              opacity: isSelected ? 0.6 : 1,
-            }}
-          >
-            👕
-          </Text>
-          {isCaptain && (
+        <View
+          style={[
+            styles.jerseyCard,
+            { backgroundColor: player.clubColor },
+            isSelected && styles.jerseyGlow,
+          ]}
+        >
+          <Text style={styles.jerseyEmoji}>👕</Text>
+          {isCaptain && !isBench && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>C</Text>
             </View>
           )}
         </View>
-        <View style={styles.playerNameBg}>
-          <Text style={styles.playerName} numberOfLines={1}>
+        <View style={styles.playerNameBox}>
+          <Text style={styles.playerNameText} numberOfLines={1}>
             {player.name}
           </Text>
         </View>
-        <View style={styles.fixtureBg}>
+        <View style={styles.fixtureBox}>
           <Text style={styles.fixtureText}>{player.nextFixture}</Text>
         </View>
       </TouchableOpacity>
@@ -298,191 +270,333 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.pitchArea}>
-        <PitchBackground />
-        <View style={styles.pitchContent}>
-          <View style={styles.row}>
-            {pitchRows.GKP.map((p) => (
-              <PlayerSlot key={p.id} player={p} />
-            ))}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* HEADER SECTION WITH SAVE TEAM */}
+        <View style={styles.topSection}>
+          <View style={styles.headerRow}>
+            <Text style={styles.pickTeamTitle}>Pick Team</Text>
+            {hasChanges && (
+              <TouchableOpacity
+                style={styles.saveBtnTop}
+                onPress={() => {
+                  Alert.alert("Success", "Squad Saved!");
+                  setHasChanges(false);
+                }}
+              >
+                <Text style={styles.saveBtnText}>Save Team</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={styles.row}>
-            {pitchRows.DEF.map((p) => (
-              <PlayerSlot key={p.id} player={p} />
-            ))}
-          </View>
-          <View style={styles.row}>
-            {pitchRows.MID.map((p) => (
-              <PlayerSlot key={p.id} player={p} />
-            ))}
-          </View>
-          <View style={styles.row}>
-            {pitchRows.FWD.map((p) => (
-              <PlayerSlot key={p.id} player={p} />
-            ))}
+          <View style={styles.gameweekBar}>
+            <Text style={styles.gwText}>Gameweek 23 • </Text>
+            <Text style={styles.deadlineText}>Deadline: Sat 24 Jan, 11:00</Text>
           </View>
         </View>
-      </View>
 
-      {/* BENCH SECTION with Dynamic Glow */}
-      <View
-        style={[
-          styles.benchContainer,
-          selectedForSwap && styles.benchActiveGlow,
-        ]}
-      >
-        <View style={styles.benchHeader}>
-          <Text
-            style={[styles.benchTitle, selectedForSwap && { color: "#38003c" }]}
-          >
-            {selectedForSwap ? "SELECT SUB TO SWAP" : "SUBSTITUTES"}
-          </Text>
-        </View>
-        <View style={styles.benchRow}>
-          {bench.map((p) => (
-            <PlayerSlot key={p.id} player={p} isBench />
+        {/* CHIPS GRID */}
+        <View style={styles.chipsGrid}>
+          {[
+            { name: "Bench Boost", icon: "⬆️" },
+            { name: "Triple Captain", icon: "👑" },
+            { name: "Wildcard", icon: "🃏" },
+            { name: "Free Hit", icon: "⚡" },
+          ].map((chip, idx) => (
+            <View key={idx} style={styles.chipCard}>
+              <View style={styles.chipIconCircle}>
+                <Text style={{ fontSize: 20 }}>{chip.icon}</Text>
+              </View>
+              <Text style={styles.chipNameText}>{chip.name}</Text>
+              <TouchableOpacity style={styles.chipPlayBtn}>
+                <Text style={styles.chipPlayText}>Play</Text>
+              </TouchableOpacity>
+            </View>
           ))}
         </View>
-      </View>
+
+        {/* PITCH AREA */}
+        <View style={styles.pitchContainer}>
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: "#37B34A" }]}
+          >
+            {[...Array(14)].map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.stripe,
+                  { backgroundColor: i % 2 === 0 ? "#37B34A" : "#2FA03F" },
+                ]}
+              />
+            ))}
+            <View style={styles.centerLine} />
+            <View style={styles.centerCircle} />
+            <View style={styles.penaltyAreaTop} />
+            <View style={styles.penaltyAreaBottom} />
+          </View>
+          <View style={styles.pitchContent}>
+            <View style={styles.pitchRow}>
+              {pitchRows.GKP.map((p) => (
+                <PlayerSlot key={p.id} player={p} />
+              ))}
+            </View>
+            <View style={styles.pitchRow}>
+              {pitchRows.DEF.map((p) => (
+                <PlayerSlot key={p.id} player={p} />
+              ))}
+            </View>
+            <View style={styles.pitchRow}>
+              {pitchRows.MID.map((p) => (
+                <PlayerSlot key={p.id} player={p} />
+              ))}
+            </View>
+            <View style={styles.pitchRow}>
+              {pitchRows.FWD.map((p) => (
+                <PlayerSlot key={p.id} player={p} />
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* FIXED SUBSTITUTES AREA */}
+        <View
+          style={[
+            styles.subContainer,
+            selectedForSwap && styles.subContainerActive,
+          ]}
+        >
+          <View style={styles.subHeader}>
+            <Text style={styles.subHeaderTextMain}>
+              {selectedForSwap ? "COMPLETE SWAP" : "SUBSTITUTES"}
+            </Text>
+          </View>
+          <View style={styles.benchHeaderRow}>
+            {bench.map((p) => (
+              <View key={p.id} style={styles.benchLabel}>
+                <Text style={styles.benchLabelText}>{p.position}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.subRow}>
+            {bench.map((p) => (
+              <PlayerSlot key={p.id} player={p} isBench />
+            ))}
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#1b5e20" },
-  pitchArea: {
-    flex: 1,
-    margin: 5,
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  topSection: {
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+  },
+  pickTeamTitle: { fontSize: 24, fontWeight: "900", color: "#37003C" },
+  saveBtnTop: {
+    position: "absolute",
+    right: 0,
+    backgroundColor: "#00FF85",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  saveBtnText: { color: "#37003C", fontWeight: "900", fontSize: 11 },
+  gameweekBar: { flexDirection: "row", marginTop: 4 },
+  gwText: { fontSize: 13, color: "#666" },
+  deadlineText: { fontSize: 13, fontWeight: "700", color: "#37003C" },
+
+  chipsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    marginVertical: 10,
+  },
+  chipCard: {
+    width: (width - 40) / 4,
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: "#eee",
+    elevation: 2,
+  },
+  chipIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#F0F8FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  chipNameText: {
+    fontSize: 8,
+    fontWeight: "800",
+    color: "#37003C",
+    textAlign: "center",
+  },
+  chipPlayBtn: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#37003C",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  chipPlayText: { fontSize: 9, fontWeight: "900", color: "#37003C" },
+
+  pitchContainer: {
+    height: height * 0.58,
+    marginHorizontal: 5,
     borderRadius: 15,
     overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  pitchContent: {
-    flex: 1,
-    justifyContent: "space-around",
-    paddingVertical: 10,
   },
   stripe: { flex: 1 },
   centerLine: {
     position: "absolute",
     top: "50%",
     width: "100%",
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    height: 2,
+    backgroundColor: "rgba(255,255,255,0.6)",
   },
   centerCircle: {
     position: "absolute",
     top: "43%",
-    left: width / 2 - 50,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    left: width / 2 - 45,
+    width: 85,
+    height: 85,
+    borderRadius: 42.5,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.6)",
   },
   penaltyAreaTop: {
     position: "absolute",
     top: -1,
     left: "20%",
     width: "60%",
-    height: 70,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    height: 65,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.6)",
   },
   penaltyAreaBottom: {
     position: "absolute",
     bottom: -1,
     left: "20%",
     width: "60%",
-    height: 70,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    height: 65,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.6)",
   },
 
-  row: {
-    flexDirection: "row",
+  pitchContent: {
+    flex: 1,
+    justifyContent: "space-around",
+    paddingVertical: 10,
+  },
+  pitchRow: { flexDirection: "row", justifyContent: "center", gap: 2 },
+
+  playerSlot: { alignItems: "center", width: width / 5.4 },
+  playerSlotSelected: { borderRadius: 8 },
+  jerseyCard: {
+    width: 55,
+    height: 65,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-    width: "100%",
-  },
-  slot: {
-    alignItems: "center",
-    width: width / 5.8,
-    marginHorizontal: 2,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  selectedSlot: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    marginBottom: 4,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
     borderWidth: 1,
-    borderColor: "#00ff85",
+    borderColor: "rgba(255,255,255,0.3)",
   },
-
-  jerseyContainer: { position: "relative" },
+  jerseyGlow: {
+    shadowColor: "#00FF85",
+    shadowOpacity: 1,
+    shadowRadius: 15,
+    borderColor: "#00FF85",
+    borderWidth: 3,
+    elevation: 15,
+  },
+  jerseyEmoji: { fontSize: 38 },
   badge: {
     position: "absolute",
-    top: -2,
-    right: -8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#38003C",
+    top: -5,
+    right: -5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#37003C",
+    borderWidth: 2,
+    borderColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#FFF",
   },
-  badgeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
+  badgeText: { color: "#fff", fontSize: 11, fontWeight: "900" },
 
-  playerNameBg: {
-    backgroundColor: "#38003c",
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 2,
-    marginTop: 2,
-    width: "98%",
-  },
-  playerName: {
-    color: "#fff",
-    fontSize: 8,
-    fontWeight: "800",
-    textAlign: "center",
-    textTransform: "uppercase",
-  },
-
-  fixtureBg: {
+  playerNameBox: {
     backgroundColor: "#fff",
-    paddingHorizontal: 2,
-    marginTop: 1,
+    width: "100%",
     borderRadius: 2,
-    width: "98%",
+    paddingVertical: 2,
   },
-  fixtureText: {
-    color: "#333",
-    fontSize: 7,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-
-  // BENCH STYLES
-  benchContainer: {
-    backgroundColor: "#fff",
-    paddingBottom: 30,
-    paddingTop: 12,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    elevation: 20,
-    borderTopWidth: 4,
-    borderTopColor: "transparent",
-  },
-  benchActiveGlow: { borderTopColor: "#00ff85", backgroundColor: "#f0fff4" }, // Subtle green glow when active
-  benchHeader: { alignItems: "center", marginBottom: 8 },
-  benchTitle: {
+  playerNameText: {
     fontSize: 9,
     fontWeight: "900",
-    color: "#AAA",
-    letterSpacing: 1.5,
+    textAlign: "center",
+    color: "#333",
   },
-  benchRow: { flexDirection: "row", justifyContent: "space-evenly" },
+  fixtureBox: {
+    backgroundColor: "#37003C",
+    width: "100%",
+    borderRadius: 2,
+    marginTop: 1,
+  },
+  fixtureText: {
+    fontSize: 8,
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+
+  subContainer: {
+    backgroundColor: "#A9DFC3",
+    marginHorizontal: 5,
+    marginTop: 10,
+    marginBottom: 30,
+    borderRadius: 15,
+    paddingBottom: 15,
+    borderTopWidth: 5,
+    borderTopColor: "transparent",
+  },
+  subContainerActive: { borderTopColor: "#00FF85", backgroundColor: "#E8F5E9" },
+  subHeader: { alignItems: "center", paddingVertical: 10 },
+  subHeaderTextMain: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#37003C",
+    letterSpacing: 1,
+  },
+  benchHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingHorizontal: 5,
+    marginBottom: 5,
+  },
+  benchLabel: { width: width / 5.4, alignItems: "center" },
+  benchLabelText: { fontSize: 10, fontWeight: "900", color: "#37003C" },
+  subRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingHorizontal: 5,
+  },
 });
