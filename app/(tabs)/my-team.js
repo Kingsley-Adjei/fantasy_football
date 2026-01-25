@@ -155,6 +155,147 @@ const MOCK_SQUAD = [
   },
 ];
 
+const PlayerProfileModal = ({
+  visible,
+  player,
+  onClose,
+  onTransferOut,
+  onMakeCaptain,
+  showTransferButton,
+  showCaptainButton,
+}) => {
+  const slideAnim = React.useRef(new Animated.Value(height)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      slideAnim.setValue(height);
+      fadeAnim.setValue(0);
+    }
+  }, [visible]);
+
+  if (!player) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={styles.modalBackground}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.profileContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View
+              style={[
+                styles.profileHeader,
+                { backgroundColor: player.clubColor || "#37003C" },
+              ]}
+            >
+              <View style={styles.gradientOverlay} />
+              <View style={styles.avatarContainer}>
+                <View style={styles.avatarCircle}>
+                  <Text style={{ fontSize: 50 }}>👤</Text>
+                </View>
+              </View>
+              <View style={styles.playerNameSection}>
+                <Text style={styles.playerName}>{player.name}</Text>
+                <View style={styles.clubRow}>
+                  <Text style={styles.clubText}>
+                    {player.realClub} - {player.position}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.actionButtonsRow}>
+              {showCaptainButton && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={onMakeCaptain}
+                >
+                  <View
+                    style={[
+                      styles.actionIconCircle,
+                      { backgroundColor: "#9C27B0" },
+                    ]}
+                  >
+                    <Text style={styles.actionIcon}>C</Text>
+                  </View>
+                  <Text style={styles.actionLabel}>Make captain</Text>
+                </TouchableOpacity>
+              )}
+              {showTransferButton && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={onTransferOut}
+                >
+                  <View
+                    style={[
+                      styles.actionIconCircle,
+                      { backgroundColor: "#F44336" },
+                    ]}
+                  >
+                    <Text style={styles.actionIcon}>↔️</Text>
+                  </View>
+                  <Text style={styles.actionLabel}>Transfer out</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Price</Text>
+                <Text style={styles.statValue}>₵{player.price}m</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Total</Text>
+                <Text style={styles.statValue}>104 pts</Text>
+              </View>
+            </View>
+
+            <View style={styles.fixturesSection}>
+              <Text style={styles.sectionTitle}>Upcoming Fixtures</Text>
+              <View style={styles.fixtureRow}>
+                <Text style={styles.fixtureOpponent}>LIV (H)</Text>
+                <Text style={styles.fixtureDate}>Sat 31 Jan</Text>
+              </View>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
 export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
   const [selectedPlayerProfile, setSelectedPlayerProfile] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -316,9 +457,13 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
   };
 
   const executeTransfer = () => {
+    const wasCaptain = playerToTransferOut.id === captainId;
     const newSquad = squad.map((p) =>
       p.id === playerToTransferOut.id ? playerToTransferIn : p
     );
+    if (wasCaptain) {
+      setCaptainId(pendingTransferIn.id);
+    }
     const priceDiff = playerToTransferOut.price - playerToTransferIn.price;
     setSquad(newSquad);
     setBudget((prev) => prev + priceDiff);
@@ -639,82 +784,120 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
           />
         </SafeAreaView>
       </Modal>
-      <Modal
+      <PlayerProfileModal
         visible={showProfileModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowProfileModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.profileContainer}>
-            {/* Header with Club Color */}
-            <View
-              style={[
-                styles.profileHeader,
-                {
-                  backgroundColor:
-                    selectedPlayerProfile?.clubColor || "#37003C",
-                },
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setShowProfileModal(false)}
-              >
-                <Text style={styles.closeBtnText}>✕</Text>
-              </TouchableOpacity>
-              <View style={styles.profileHeaderContent}>
-                <View style={styles.avatarCircle}>
-                  <Text style={{ fontSize: 40 }}>👤</Text>
-                </View>
-                <View>
-                  <Text style={styles.profileNameText}>
-                    {selectedPlayerProfile?.name}
-                  </Text>
-                  <Text style={styles.profileSubText}>
-                    {selectedPlayerProfile?.realClub} •{" "}
-                    {selectedPlayerProfile?.position}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Stats Dashboard */}
-            <View style={styles.profileStatsRow}>
-              <View style={styles.pStatItem}>
-                <Text style={styles.pStatVal}>12</Text>
-                <Text style={styles.pStatLab}>Goals</Text>
-              </View>
-              <View style={styles.pStatItem}>
-                <Text style={styles.pStatVal}>5</Text>
-                <Text style={styles.pStatLab}>Assists</Text>
-              </View>
-              <View style={styles.pStatItem}>
-                <Text style={styles.pStatVal}>104</Text>
-                <Text style={styles.pStatLab}>Total Pts</Text>
-              </View>
-            </View>
-
-            {/* Upcoming Fixtures */}
-            <View style={styles.profileFixtures}>
-              <Text style={styles.pSectionTitle}>UPCOMING FIXTURES</Text>
-              <View style={styles.pFixtureRow}>
-                <Text style={styles.pFixOpp}>LIV (H)</Text>
-                <Text style={styles.pFixDate}>Sat 31 Jan</Text>
-              </View>
-              <View style={styles.pFixtureRow}>
-                <Text style={styles.pFixOpp}>MCI (A)</Text>
-                <Text style={styles.pFixDate}>Sun 08 Feb</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        player={selectedPlayerProfile}
+        onClose={() => setShowProfileModal(false)}
+        onTransferOut={() => {
+          setShowProfileModal(false);
+          handlePlayerPressTransferMode(selectedPlayerProfile, false);
+        }}
+        onMakeCaptain={() => {
+          setCaptainId(selectedPlayerProfile.id);
+          setHasChanges(true);
+          setShowProfileModal(false);
+        }}
+        showTransferButton={mode === "transfers"}
+        showCaptainButton={mode === "team"}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "flex-end",
+  },
+  modalBackground: { flex: 1 },
+  profileContainer: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "85%",
+    elevation: 10,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeButtonText: { fontSize: 20, color: "#FFFFFF", fontWeight: "700" },
+  profileHeader: {
+    paddingTop: 40,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    position: "relative",
+    overflow: "hidden",
+  },
+  gradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+  },
+  avatarCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playerName: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    marginBottom: 8,
+  },
+  clubText: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
+  actionButtonsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    justifyContent: "space-around",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  actionIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  actionIcon: { fontSize: 24, color: "#FFFFFF", fontWeight: "700" },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#37003C",
+    textAlign: "center",
+  },
+  statsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F8F8F8",
+    marginHorizontal: 20,
+    marginVertical: 16,
+    padding: 16,
+    borderRadius: 12,
+  },
+  statItem: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 18, fontWeight: "900", color: "#37003C" },
+  statDivider: { width: 1, backgroundColor: "#E0E0E0", marginHorizontal: 12 },
+  fixturesSection: { paddingHorizontal: 20, paddingVertical: 16 },
+  fixtureRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+  },
+
   playerSlotContainer: {
     alignItems: "center",
     width: width / 5.4,
