@@ -8,7 +8,12 @@ import {
   Dimensions,
   Alert,
   ScrollView,
+  Modal,
+  FlatList,
 } from "react-native";
+import { POSITIONS, sortPlayersFPLStyle } from "../../src/constants/positions";
+import { MOCK_PLAYERS } from "../../src/services/api";
+import SearchBar from "../../src/components/ui/SearchBar";
 
 const { width, height } = Dimensions.get("window");
 
@@ -17,6 +22,7 @@ const MOCK_SQUAD = [
     id: 1,
     name: "Raya",
     position: "GK",
+    price: 5.0,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -25,6 +31,7 @@ const MOCK_SQUAD = [
     id: 2,
     name: "Saliba",
     position: "DEF",
+    price: 6.0,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -33,6 +40,7 @@ const MOCK_SQUAD = [
     id: 3,
     name: "Gabriel",
     position: "DEF",
+    price: 6.0,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -41,6 +49,7 @@ const MOCK_SQUAD = [
     id: 4,
     name: "Van Dijk",
     position: "DEF",
+    price: 6.5,
     realClub: "Liverpool",
     clubColor: "#C8102E",
     nextFixture: "ARS (A)",
@@ -49,6 +58,7 @@ const MOCK_SQUAD = [
     id: 5,
     name: "Udogie",
     position: "DEF",
+    price: 5.0,
     realClub: "Spurs",
     clubColor: "#132257",
     nextFixture: "MCI (H)",
@@ -57,6 +67,7 @@ const MOCK_SQUAD = [
     id: 6,
     name: "Saka",
     position: "MID",
+    price: 8.5,
     realClub: "Arsenal",
     clubColor: "#EF0107",
     nextFixture: "LIV (H)",
@@ -65,6 +76,7 @@ const MOCK_SQUAD = [
     id: 7,
     name: "Salah",
     position: "MID",
+    price: 12.5,
     realClub: "Liverpool",
     clubColor: "#C8102E",
     nextFixture: "ARS (A)",
@@ -73,6 +85,7 @@ const MOCK_SQUAD = [
     id: 8,
     name: "Son",
     position: "MID",
+    price: 9.0,
     realClub: "Spurs",
     clubColor: "#132257",
     nextFixture: "MCI (H)",
@@ -81,6 +94,7 @@ const MOCK_SQUAD = [
     id: 9,
     name: "Palmer",
     position: "MID",
+    price: 6.0,
     realClub: "Chelsea",
     clubColor: "#034694",
     nextFixture: "NEW (A)",
@@ -89,6 +103,7 @@ const MOCK_SQUAD = [
     id: 10,
     name: "Haaland",
     position: "FWD",
+    price: 14.0,
     realClub: "Man City",
     clubColor: "#6CABDD",
     nextFixture: "TOT (A)",
@@ -97,6 +112,7 @@ const MOCK_SQUAD = [
     id: 11,
     name: "Watkins",
     position: "FWD",
+    price: 8.0,
     realClub: "Aston Villa",
     clubColor: "#95BFE5",
     nextFixture: "BOU (H)",
@@ -105,6 +121,7 @@ const MOCK_SQUAD = [
     id: 12,
     name: "Areola",
     position: "GK",
+    price: 4.0,
     realClub: "West Ham",
     clubColor: "#7A263A",
     nextFixture: "MUN (A)",
@@ -113,6 +130,7 @@ const MOCK_SQUAD = [
     id: 13,
     name: "Burn",
     position: "DEF",
+    price: 4.5,
     realClub: "Newcastle",
     clubColor: "#241F20",
     nextFixture: "CHE (H)",
@@ -121,6 +139,7 @@ const MOCK_SQUAD = [
     id: 14,
     name: "Gordon",
     position: "MID",
+    price: 5.5,
     realClub: "Newcastle",
     clubColor: "#241F20",
     nextFixture: "CHE (H)",
@@ -129,17 +148,32 @@ const MOCK_SQUAD = [
     id: 15,
     name: "Archer",
     position: "FWD",
+    price: 4.5,
     realClub: "Sheffield Utd",
     clubColor: "#EE2737",
     nextFixture: "EVE (A)",
   },
 ];
 
-export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
+export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
+  const [selectedPlayerProfile, setSelectedPlayerProfile] = useState(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  const [mode, setMode] = useState("team");
   const [squad, setSquad] = useState(selectedPlayers);
+
+  const [originalSquad, setOriginalSquad] = useState(selectedPlayers);
   const [captainId, setCaptainId] = useState(10);
   const [selectedForSwap, setSelectedForSwap] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+
+  const [freeTransfers, setFreeTransfers] = useState(1);
+  const [budget, setBudget] = useState(1.1);
+  const [playerToTransferOut, setPlayerToTransferOut] = useState(null);
+  const [playerToTransferIn, setPlayerToTransferIn] = useState(null);
+  const [showPlayerList, setShowPlayerList] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [allPlayers] = useState(sortPlayersFPLStyle(MOCK_PLAYERS));
 
   const starters = useMemo(() => squad.slice(0, 11), [squad]);
   const bench = useMemo(() => squad.slice(11, 15), [squad]);
@@ -154,7 +188,24 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
     [starters]
   );
 
-  const handlePlayerPress = (player, isBench) => {
+  const pointsDeduction = useMemo(() => {
+    const transfersMade = playerToTransferOut && playerToTransferIn ? 1 : 0;
+    return transfersMade > freeTransfers
+      ? (transfersMade - freeTransfers) * 4
+      : 0;
+  }, [playerToTransferOut, playerToTransferIn, freeTransfers]);
+
+  const filteredPlayers = useMemo(() => {
+    if (!playerToTransferOut) return [];
+    return allPlayers.filter((player) => {
+      if (player.position !== playerToTransferOut.position) return false;
+      if (squad.find((p) => p.id === player.id)) return false;
+      return player.name.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+  }, [allPlayers, searchQuery, playerToTransferOut, squad]);
+
+  // --- TEAM FUNCTIONS ---
+  const handlePlayerPressTeamMode = (player, isBench) => {
     if (selectedForSwap?.id === player.id) {
       setSelectedForSwap(null);
       return;
@@ -231,93 +282,260 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
     setHasChanges(true);
   };
 
+  // --- TRANSFER FUNCTIONS ---
+  const handlePlayerPressTransferMode = (player, isBench) => {
+    if (playerToTransferOut?.id === player.id) {
+      setPlayerToTransferOut(null);
+      return;
+    }
+    setPlayerToTransferOut(player);
+    setShowPlayerList(true);
+  };
+
+  const handleSelectIn = (player) => {
+    const priceDiff = player.price - playerToTransferOut.price;
+    if (priceDiff > budget) {
+      Alert.alert(
+        "Insufficient Budget",
+        `You need ₵${(priceDiff - budget).toFixed(1)}m more.`
+      );
+      return;
+    }
+    const clubCount = squad.filter(
+      (p) => p.realClub === player.realClub && p.id !== playerToTransferOut.id
+    ).length;
+    if (clubCount >= 3) {
+      Alert.alert(
+        "Club Limit",
+        `Max 3 players allowed from ${player.realClub}`
+      );
+      return;
+    }
+    setPlayerToTransferIn(player);
+    setShowPlayerList(false);
+  };
+
+  const executeTransfer = () => {
+    const newSquad = squad.map((p) =>
+      p.id === playerToTransferOut.id ? playerToTransferIn : p
+    );
+    const priceDiff = playerToTransferOut.price - playerToTransferIn.price;
+    setSquad(newSquad);
+    setBudget((prev) => prev + priceDiff);
+    if (freeTransfers > 0) setFreeTransfers((prev) => prev - 1);
+    setPlayerToTransferOut(null);
+    setPlayerToTransferIn(null);
+    Alert.alert("Success! ✅", "Transfer completed!");
+  };
+
+  // --- RENDER HELPERS ---
   const PlayerSlot = ({ player, isBench }) => {
     if (!player) return null;
     const isCaptain = player.id === captainId;
-    const isSelected = selectedForSwap?.id === player.id;
+    const isSelectedSwap = mode === "team" && selectedForSwap?.id === player.id;
+    const isTransferOut =
+      mode === "transfers" && playerToTransferOut?.id === player.id;
 
     return (
-      <TouchableOpacity
-        style={[styles.playerSlot, isSelected && styles.playerSlotSelected]}
-        onPress={() => handlePlayerPress(player, isBench)}
-        onLongPress={() => !isBench && setCaptainId(player.id)}
-      >
-        <View
+      <View style={styles.playerSlotContainer}>
+        {/* 1. JERSEY AREA: For Management (Swaps/Transfers) */}
+        <TouchableOpacity
           style={[
-            styles.jerseyCard,
-            { backgroundColor: player.clubColor },
-            isSelected && styles.jerseyGlow,
+            styles.playerSlot,
+            (isSelectedSwap || isTransferOut) && styles.playerSlotSelected,
           ]}
+          onPress={() =>
+            mode === "team"
+              ? handlePlayerPressTeamMode(player, isBench)
+              : handlePlayerPressTransferMode(player, isBench)
+          }
+          onLongPress={() =>
+            mode === "team" && !isBench && setCaptainId(player.id)
+          }
         >
-          <Text style={styles.jerseyEmoji}>👕</Text>
-          {isCaptain && !isBench && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>C</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.playerNameBox}>
-          <Text style={styles.playerNameText} numberOfLines={1}>
-            {player.name}
-          </Text>
-        </View>
-        <View style={styles.fixtureBox}>
-          <Text style={styles.fixtureText}>{player.nextFixture}</Text>
-        </View>
-      </TouchableOpacity>
+          <View
+            style={[
+              styles.jerseyCard,
+              { backgroundColor: player.clubColor },
+              isSelectedSwap && styles.jerseyGlow,
+              isTransferOut && styles.jerseyTransferOut,
+            ]}
+          >
+            <Text style={styles.jerseyEmoji}>👕</Text>
+            {isCaptain && !isBench && mode === "team" && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>C</Text>
+              </View>
+            )}
+            {isTransferOut && (
+              <View style={styles.transferOutBadge}>
+                <Text style={styles.transferOutText}>OUT</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {/* 2. TEXT AREA: For Information (Player Profile) */}
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedPlayerProfile(player);
+            setShowProfileModal(true);
+          }}
+          style={styles.infoTouchArea} // FIX: Changed StyleSheet to styles
+        >
+          <View style={styles.playerNameBox}>
+            <Text style={styles.playerNameText} numberOfLines={1}>
+              {player.name}
+            </Text>
+          </View>
+          <View style={styles.fixtureBox}>
+            <Text style={styles.fixtureText}>
+              {mode === "transfers"
+                ? `₵${player.price.toFixed(1)}m`
+                : player.nextFixture}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const handleRevertChanges = () => {
+    Alert.alert(
+      "Reset Changes?",
+      "This will undo all unsaved swaps or transfers.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Revert",
+          onPress: () => {
+            setSquad(originalSquad);
+            setPlayerToTransferOut(null);
+            setPlayerToTransferIn(null);
+            setSelectedForSwap(null);
+            setHasChanges(false);
+            setBudget(1.1);
+          },
+          style: "destructive",
+        },
+      ]
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* HEADER SECTION WITH SAVE TEAM */}
-        <View style={styles.topSection}>
-          <View style={styles.headerRow}>
-            <Text style={styles.pickTeamTitle}>Pick Team</Text>
-            {hasChanges && (
-              <TouchableOpacity
-                style={styles.saveBtnTop}
-                onPress={() => {
-                  Alert.alert("Success", "Squad Saved!");
-                  setHasChanges(false);
-                }}
-              >
-                <Text style={styles.saveBtnText}>Save Team</Text>
-              </TouchableOpacity>
-            )}
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <Text style={styles.headerTitle}>Pick Team</Text>
+
+            <View style={styles.headerButtonGroup}>
+              {(hasChanges || playerToTransferOut) && (
+                <TouchableOpacity
+                  style={[styles.saveBtn || { backgroundColor: "#EEE" }]}
+                  onPress={handleRevertChanges}
+                >
+                  <Text style={[styles.saveBtnText, { color: "#666" }]}>
+                    Revert
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {(hasChanges || (playerToTransferOut && playerToTransferIn)) && (
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={() =>
+                    mode === "team"
+                      ? (Alert.alert("Saved!"), setHasChanges(false))
+                      : executeTransfer()
+                  }
+                >
+                  <Text style={styles.saveBtnText}>Save</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <View style={styles.gameweekBar}>
-            <Text style={styles.gwText}>Gameweek 23 • </Text>
-            <Text style={styles.deadlineText}>Deadline: Sat 24 Jan, 11:00</Text>
-          </View>
+          <Text style={styles.headerSubtitle}>
+            Gameweek 23 •{" "}
+            <Text style={{ fontWeight: "700" }}>
+              Deadline: Sat 24 Jan, 11:00
+            </Text>
+          </Text>
         </View>
 
-        {/* CHIPS GRID */}
+        <View style={styles.modeToggle}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, mode === "team" && styles.toggleActive]}
+            onPress={() => setMode("team")}
+          >
+            <Text
+              style={[
+                styles.toggleText,
+                mode === "team" && styles.toggleTextActive,
+              ]}
+            >
+              My Team
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.toggleBtn,
+              mode === "transfers" && styles.toggleActive,
+            ]}
+            onPress={() => setMode("transfers")}
+          >
+            <Text
+              style={[
+                styles.toggleText,
+                mode === "transfers" && styles.toggleTextActive,
+              ]}
+            >
+              Transfers
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {mode === "transfers" && (
+          <View style={styles.transferStats}>
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>{freeTransfers}</Text>
+              <Text style={styles.statLab}>Free</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>{pointsDeduction}</Text>
+              <Text style={styles.statLab}>Cost</Text>
+            </View>
+            <View style={[styles.statBox, styles.budgetBox]}>
+              <Text style={styles.statVal}>₵{budget.toFixed(1)}m</Text>
+              <Text style={styles.statLab}>Budget</Text>
+            </View>
+          </View>
+        )}
+
         <View style={styles.chipsGrid}>
           {[
-            { name: "Bench Boost", icon: "⬆️" },
-            { name: "Triple Captain", icon: "👑" },
-            { name: "Wildcard", icon: "🃏" },
-            { name: "Free Hit", icon: "⚡" },
-          ].map((chip, idx) => (
-            <View key={idx} style={styles.chipCard}>
-              <View style={styles.chipIconCircle}>
-                <Text style={{ fontSize: 20 }}>{chip.icon}</Text>
+            { n: "Bench Boost", e: "⬆️" },
+            { n: "Triple Captain", e: "👑" },
+            { n: "Wildcard", e: "🃏" },
+            { n: "Free Hit", e: "⚡" },
+          ].map((c, i) => (
+            <View key={i} style={styles.chipCard}>
+              <View style={styles.chipIcon}>
+                <Text style={{ fontSize: 18 }}>{c.e}</Text>
               </View>
-              <Text style={styles.chipNameText}>{chip.name}</Text>
-              <TouchableOpacity style={styles.chipPlayBtn}>
-                <Text style={styles.chipPlayText}>Play</Text>
+              <Text style={styles.chipName}>{c.n}</Text>
+              <TouchableOpacity style={styles.playBtn}>
+                <Text style={styles.playText}>Play</Text>
               </TouchableOpacity>
             </View>
           ))}
         </View>
 
-        {/* PITCH AREA */}
         <View style={styles.pitchContainer}>
-          <View
-            style={[StyleSheet.absoluteFill, { backgroundColor: "#37B34A" }]}
-          >
+          <View style={StyleSheet.absoluteFill}>
             {[...Array(14)].map((_, i) => (
               <View
                 key={i}
@@ -333,22 +551,22 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
             <View style={styles.penaltyAreaBottom} />
           </View>
           <View style={styles.pitchContent}>
-            <View style={styles.pitchRow}>
+            <View style={styles.row}>
               {pitchRows.GKP.map((p) => (
                 <PlayerSlot key={p.id} player={p} />
               ))}
             </View>
-            <View style={styles.pitchRow}>
+            <View style={styles.row}>
               {pitchRows.DEF.map((p) => (
                 <PlayerSlot key={p.id} player={p} />
               ))}
             </View>
-            <View style={styles.pitchRow}>
+            <View style={styles.row}>
               {pitchRows.MID.map((p) => (
                 <PlayerSlot key={p.id} player={p} />
               ))}
             </View>
-            <View style={styles.pitchRow}>
+            <View style={styles.row}>
               {pitchRows.FWD.map((p) => (
                 <PlayerSlot key={p.id} player={p} />
               ))}
@@ -356,7 +574,6 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
           </View>
         </View>
 
-        {/* FIXED SUBSTITUTES AREA */}
         <View
           style={[
             styles.subContainer,
@@ -376,75 +593,270 @@ export default function MyTeamPitch({ selectedPlayers = MOCK_SQUAD }) {
             ))}
           </View>
           <View style={styles.subRow}>
-            {bench.map((p) => (
-              <PlayerSlot key={p.id} player={p} isBench />
+            {bench.map((p, index) => (
+              <PlayerSlot key={`bench-${p.id}-${index}`} player={p} />
             ))}
           </View>
         </View>
       </ScrollView>
+
+      <Modal visible={showPlayerList} animationType="slide">
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowPlayerList(false)}>
+              <Text style={{ fontSize: 18 }}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              Replace {playerToTransferOut?.name}
+            </Text>
+          </View>
+          <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+          <FlatList
+            data={filteredPlayers}
+            keyExtractor={(item) => `list-${item.id}`} // FIXED UNIQUE KEY ERROR
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.listCard}
+                onPress={() => handleSelectIn(item)}
+              >
+                <View
+                  style={[
+                    styles.listJersey,
+                    { backgroundColor: item.clubColor },
+                  ]}
+                >
+                  <Text>👕</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 15 }}>
+                  <Text style={styles.listName}>{item.name}</Text>
+                  <Text style={styles.listClub}>
+                    {item.realClub} • {item.position}
+                  </Text>
+                </View>
+                <Text style={styles.listPrice}>₵{item.price.toFixed(1)}m</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
+      <Modal
+        visible={showProfileModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowProfileModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.profileContainer}>
+            {/* Header with Club Color */}
+            <View
+              style={[
+                styles.profileHeader,
+                {
+                  backgroundColor:
+                    selectedPlayerProfile?.clubColor || "#37003C",
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setShowProfileModal(false)}
+              >
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+              <View style={styles.profileHeaderContent}>
+                <View style={styles.avatarCircle}>
+                  <Text style={{ fontSize: 40 }}>👤</Text>
+                </View>
+                <View>
+                  <Text style={styles.profileNameText}>
+                    {selectedPlayerProfile?.name}
+                  </Text>
+                  <Text style={styles.profileSubText}>
+                    {selectedPlayerProfile?.realClub} •{" "}
+                    {selectedPlayerProfile?.position}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Stats Dashboard */}
+            <View style={styles.profileStatsRow}>
+              <View style={styles.pStatItem}>
+                <Text style={styles.pStatVal}>12</Text>
+                <Text style={styles.pStatLab}>Goals</Text>
+              </View>
+              <View style={styles.pStatItem}>
+                <Text style={styles.pStatVal}>5</Text>
+                <Text style={styles.pStatLab}>Assists</Text>
+              </View>
+              <View style={styles.pStatItem}>
+                <Text style={styles.pStatVal}>104</Text>
+                <Text style={styles.pStatLab}>Total Pts</Text>
+              </View>
+            </View>
+
+            {/* Upcoming Fixtures */}
+            <View style={styles.profileFixtures}>
+              <Text style={styles.pSectionTitle}>UPCOMING FIXTURES</Text>
+              <View style={styles.pFixtureRow}>
+                <Text style={styles.pFixOpp}>LIV (H)</Text>
+                <Text style={styles.pFixDate}>Sat 31 Jan</Text>
+              </View>
+              <View style={styles.pFixtureRow}>
+                <Text style={styles.pFixOpp}>MCI (A)</Text>
+                <Text style={styles.pFixDate}>Sun 08 Feb</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  topSection: {
+  playerSlotContainer: {
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    width: width / 5.4,
+    marginBottom: 10,
   },
-  headerRow: {
+  infoTouchArea: {
+    width: "100%",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  // Modal Styles for Profile
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  profileContainer: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: "60%",
+  },
+  container: { flex: 1, backgroundColor: "#FFF" },
+  header: { alignItems: "center", paddingVertical: 10 },
+  headerTop: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center", // Keeps Title centered
     width: "100%",
+    position: "relative", // Context for the absolute button group
   },
-  pickTeamTitle: { fontSize: 24, fontWeight: "900", color: "#37003C" },
-  saveBtnTop: {
+  headerButtonGroup: {
     position: "absolute",
-    right: 0,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6, // Space between Revert and Save
+  }, // Style for Revert (Secondary)
+  revertBtn: {
+    backgroundColor: "#F0F0F0",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#DDD",
+  },
+  revertBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#666",
+  },
+
+  // Style for Save (Primary)
+  saveBtnAction: {
     backgroundColor: "#00FF85",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 15,
+    borderRadius: 10,
+    elevation: 2, // Slight shadow for the primary action
   },
-  saveBtnText: { color: "#37003C", fontWeight: "900", fontSize: 11 },
-  gameweekBar: { flexDirection: "row", marginTop: 4 },
-  gwText: { fontSize: 13, color: "#666" },
-  deadlineText: { fontSize: 13, fontWeight: "700", color: "#37003C" },
+  saveBtnText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#37003C",
+  },
+  headerTitle: { fontSize: 22, fontWeight: "900", color: "#37003C" },
+  headerSubtitle: { fontSize: 12, color: "#666", marginTop: 4 },
+  saveBtn: {
+    backgroundColor: "#00FF85",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  saveBtnText: { fontSize: 12, fontWeight: "900", color: "#37003C" },
 
+  modeToggle: {
+    flexDirection: "row",
+    backgroundColor: "#F0F0F0",
+    marginHorizontal: 20,
+    borderRadius: 10,
+    padding: 3,
+    marginVertical: 10,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  toggleActive: { backgroundColor: "#FFF", elevation: 2 },
+  toggleText: { fontSize: 13, fontWeight: "800", color: "#888" },
+  toggleTextActive: { color: "#37003C" },
+
+  transferStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingHorizontal: 15,
+    marginBottom: 10,
+  },
+  statBox: {
+    alignItems: "center",
+    backgroundColor: "#F8F8F8",
+    padding: 8,
+    borderRadius: 8,
+    width: "30%",
+  },
+  statVal: { fontSize: 16, fontWeight: "900", color: "#37003C" },
+  statLab: { fontSize: 10, fontWeight: "700", color: "#888" },
+  budgetBox: { backgroundColor: "#E8F5E9" },
   chipsGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 10,
-    marginVertical: 10,
+    marginBottom: 15,
   },
   chipCard: {
     width: (width - 40) / 4,
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF",
     borderRadius: 10,
     padding: 6,
     borderWidth: 1,
-    borderColor: "#eee",
-    elevation: 2,
+    borderColor: "#EEE",
+    elevation: 1,
   },
-  chipIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  chipIcon: {
+    width: 35,
+    height: 35,
+    borderRadius: 18,
     backgroundColor: "#F0F8FF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 4,
   },
-  chipNameText: {
+  chipName: {
     fontSize: 8,
     fontWeight: "800",
     color: "#37003C",
     textAlign: "center",
+    height: 20,
   },
-  chipPlayBtn: {
+  playBtn: {
     marginTop: 4,
     borderWidth: 1,
     borderColor: "#37003C",
@@ -452,10 +864,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  chipPlayText: { fontSize: 9, fontWeight: "900", color: "#37003C" },
+  playText: { fontSize: 9, fontWeight: "900", color: "#37003C" },
 
   pitchContainer: {
-    height: height * 0.58,
+    height: height * 0.55,
     marginHorizontal: 5,
     borderRadius: 15,
     overflow: "hidden",
@@ -496,16 +908,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.6)",
   },
-
   pitchContent: {
     flex: 1,
     justifyContent: "space-around",
     paddingVertical: 10,
   },
-  pitchRow: { flexDirection: "row", justifyContent: "center", gap: 2 },
+  row: { flexDirection: "row", justifyContent: "center", gap: 2 },
 
   playerSlot: { alignItems: "center", width: width / 5.4 },
-  playerSlotSelected: { borderRadius: 8 },
+  playerSlotSelected: { transform: [{ scale: 1.05 }] },
   jerseyCard: {
     width: 55,
     height: 65,
@@ -514,10 +925,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
     elevation: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
   },
   jerseyGlow: {
     shadowColor: "#00FF85",
@@ -525,9 +932,9 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     borderColor: "#00FF85",
     borderWidth: 3,
-    elevation: 15,
   },
-  jerseyEmoji: { fontSize: 38 },
+  jerseyTransferOut: { opacity: 0.5, borderColor: "#FF005A", borderWidth: 2 },
+  jerseyEmoji: { fontSize: 35 },
   badge: {
     position: "absolute",
     top: -5,
@@ -537,14 +944,23 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: "#37003C",
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: "#FFF",
     justifyContent: "center",
     alignItems: "center",
   },
-  badgeText: { color: "#fff", fontSize: 11, fontWeight: "900" },
+  badgeText: { color: "#FFF", fontSize: 11, fontWeight: "900" },
+  transferOutBadge: {
+    position: "absolute",
+    top: -5,
+    left: -5,
+    backgroundColor: "#FF005A",
+    paddingHorizontal: 4,
+    borderRadius: 4,
+  },
+  transferOutText: { color: "#FFF", fontSize: 8, fontWeight: "900" },
 
   playerNameBox: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF",
     width: "100%",
     borderRadius: 2,
     paddingVertical: 2,
@@ -563,7 +979,7 @@ const styles = StyleSheet.create({
   },
   fixtureText: {
     fontSize: 8,
-    color: "#fff",
+    color: "#FFF",
     textAlign: "center",
     fontWeight: "bold",
   },
@@ -572,13 +988,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#A9DFC3",
     marginHorizontal: 5,
     marginTop: 10,
-    marginBottom: 30,
     borderRadius: 15,
     paddingBottom: 15,
-    borderTopWidth: 5,
-    borderTopColor: "transparent",
   },
-  subContainerActive: { borderTopColor: "#00FF85", backgroundColor: "#E8F5E9" },
+  subContainerActive: {
+    backgroundColor: "#E8F5E9",
+    borderTopColor: "#00FF85",
+    borderTopWidth: 4,
+  },
   subHeader: { alignItems: "center", paddingVertical: 10 },
   subHeaderTextMain: {
     fontSize: 12,
@@ -590,13 +1007,56 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     paddingHorizontal: 5,
-    marginBottom: 5,
   },
   benchLabel: { width: width / 5.4, alignItems: "center" },
-  benchLabelText: { fontSize: 10, fontWeight: "900", color: "#37003C" },
+  benchLabelText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#37003C",
+    opacity: 0.7,
+  },
   subRow: {
     flexDirection: "row",
     justifyContent: "space-around",
     paddingHorizontal: 5,
   },
+
+  listHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    borderBottomWidth: 1,
+    borderColor: "#EEE",
+  },
+  listTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#37003C",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderColor: "#EEE",
+  },
+  modalTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  listCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    borderBottomWidth: 1,
+    borderColor: "#EEE",
+  },
+  listJersey: { width: 30, height: 30, borderRadius: 15 },
+  listName: { fontSize: 16, fontWeight: "bold", color: "#333" },
+  listClub: { fontSize: 12, color: "#666" },
+  listPrice: { fontSize: 16, fontWeight: "900", color: "#37003C" },
 });
