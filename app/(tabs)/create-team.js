@@ -9,6 +9,8 @@ import {
   Platform,
   ScrollView,
   Animated,
+  StatusBar, // Added
+  Dimensions,
   TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -30,6 +32,9 @@ import BudgetTracker from "../../src/components/team/BudgetTracker";
 import PositionFilter from "../../src/components/team/PositionFilter";
 import PlayerCard from "../../src/components/team/PlayerCard";
 import StepIndicator from "../../src/components/team/StepIndicator";
+
+const STATUS_BAR_HEIGHT =
+  Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 0;
 
 export default function CreateTeamScreen() {
   const router = useRouter();
@@ -185,14 +190,18 @@ export default function CreateTeamScreen() {
   };
 
   // Step 1: Team Name Input
+  // Step 1: Team Name Input
   if (step === 1) {
     return (
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.container}
       >
+        <StatusBar barStyle="dark-content" />
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-          <StepIndicator currentStep={1} totalSteps={2} />
+          <View style={styles.safeHeaderSpace}>
+            <StepIndicator currentStep={1} totalSteps={2} />
+          </View>
 
           <View style={styles.setupContainer}>
             <View style={styles.welcomeSection}>
@@ -443,6 +452,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  safeHeaderSpace: {
+    paddingTop: STATUS_BAR_HEIGHT + 10,
+    backgroundColor: "#FFFFFF",
+  },
   scrollView: {
     flex: 1,
   },
@@ -450,32 +463,38 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 140,
   },
-
-  // Step 1 Styles
   setupContainer: {
     flex: 1,
-    padding: 24,
+    paddingHorizontal: 24,
     justifyContent: "space-between",
   },
   welcomeSection: {
     alignItems: "center",
-    marginTop: 40,
-    marginBottom: 40,
+    marginTop: 20, // Reduced from 40
+    marginBottom: 20,
   },
   emoji: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 50, // Reduced from 64
+    marginBottom: 10,
+  },
+  title: {
+    fontSize: 24, // Reduced from 26
+    fontWeight: "900",
+    color: "#333",
+    marginBottom: 6,
+    textAlign: "center",
   },
   setupSubtitle: {
     fontSize: 14,
     color: "#666",
     textAlign: "center",
-    marginTop: 8,
+    marginTop: 4,
     lineHeight: 20,
   },
   formSection: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingTop: 20,
   },
   tipBox: {
     flexDirection: "row",
@@ -483,52 +502,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F4FF",
     padding: 14,
     borderRadius: 10,
-    marginTop: 16,
+    marginTop: 20,
     borderLeftWidth: 3,
     borderLeftColor: "#38003C",
   },
-  tipIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#555",
-    lineHeight: 18,
-  },
-  step1Footer: {
-    paddingBottom: 20,
-  },
-
-  // Step 2 Styles
-  header: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "900",
-    color: "#333",
-    marginBottom: 6,
-  },
-  teamNameBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  teamNameLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#888",
-    letterSpacing: 0.5,
-  },
-  teamNameText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#38003C",
-  },
-
-  // Dashboard Styles
+  tipIcon: { fontSize: 18, marginRight: 10 },
+  tipText: { flex: 1, fontSize: 13, color: "#555", lineHeight: 18 },
+  step1Footer: { paddingBottom: 40 },
+  header: { marginBottom: 16 },
+  teamNameBadge: { flexDirection: "row", alignItems: "center", gap: 6 },
+  teamNameLabel: { fontSize: 11, fontWeight: "800", color: "#888" },
+  teamNameText: { fontSize: 14, fontWeight: "700", color: "#38003C" },
   dashboardContainer: {
     backgroundColor: "#F8F8F8",
     borderRadius: 14,
@@ -543,68 +527,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  dashboardTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#666",
-    letterSpacing: 0.3,
-  },
+  dashboardTitle: { fontSize: 13, fontWeight: "700", color: "#666" },
   dashboardBadge: {
     backgroundColor: "#38003C",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  dashboardBadgeText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-  statRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  statItem: {
-    alignItems: "center",
-  },
+  dashboardBadgeText: { fontSize: 12, fontWeight: "800", color: "#FFFFFF" },
+  statRow: { flexDirection: "row", justifyContent: "space-around" },
+  statItem: { alignItems: "center" },
   statCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#E8E8E8",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 6,
   },
-  statCircleComplete: {
-    backgroundColor: "#00FF87",
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#666",
-  },
-  statValueComplete: {
-    color: "#38003C",
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#38003C",
-  },
-  statRequired: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#999",
-    marginTop: 1,
-  },
-
-  // Action Buttons Row
-  actionButtonsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 16,
-  },
+  statCircleComplete: { backgroundColor: "#00FF87" },
+  statValue: { fontSize: 16, fontWeight: "900", color: "#666" },
+  statValueComplete: { color: "#38003C" },
+  statLabel: { fontSize: 11, fontWeight: "700", color: "#38003C" },
+  statRequired: { fontSize: 10, color: "#999" },
+  actionButtonsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   secondaryButton: {
     flex: 1,
     flexDirection: "row",
@@ -612,30 +559,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#F0F0F0",
     paddingVertical: 14,
-    paddingHorizontal: 16,
     borderRadius: 10,
     gap: 6,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
   },
-  secondaryButtonDisabled: {
-    opacity: 0.4,
-  },
-  secondaryButtonIcon: {
-    fontSize: 16,
-  },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#333",
-  },
-  secondaryButtonTextDisabled: {
-    color: "#999",
-  },
+  secondaryButtonDisabled: { opacity: 0.4 },
+  secondaryButtonIcon: { fontSize: 16 },
+  secondaryButtonText: { fontSize: 14, fontWeight: "700", color: "#333" },
+  secondaryButtonTextDisabled: { color: "#999" },
   resetButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     backgroundColor: "#FFF5F5",
     paddingVertical: 14,
     paddingHorizontal: 18,
@@ -644,51 +577,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FFE0E0",
   },
-  resetButtonIcon: {
-    fontSize: 18,
-    color: "#FF005A",
-  },
-  resetButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FF005A",
-  },
-
-  // List Styles
-  list: {
-    paddingTop: 10,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    padding: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#999",
-    marginBottom: 6,
-  },
-  emptySubtext: {
-    fontSize: 13,
-    color: "#BBB",
-  },
-
-  // Bottom Actions
+  resetButtonIcon: { fontSize: 18, color: "#FF005A" },
+  resetButtonText: { fontSize: 14, fontWeight: "700", color: "#FF005A" },
+  list: { paddingTop: 10 },
   bottomActions: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 24 : 16,
+    paddingBottom: Platform.OS === "ios" ? 34 : 16,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#E8E8E8",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
   },
   warningBanner: {
     flexDirection: "row",
@@ -698,38 +599,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 8,
     marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: "#FFB800",
   },
-  warningIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8B6700",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
+  warningIcon: { fontSize: 16, marginRight: 8 },
+  warningText: { flex: 1, fontSize: 13, fontWeight: "600", color: "#8B6700" },
+  buttonRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   backButton: {
     paddingVertical: 14,
     paddingHorizontal: 20,
     backgroundColor: "#F5F5F5",
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
   },
-  backButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#555",
-  },
-  flex: {
-    flex: 1,
-  },
+  backButtonText: { fontSize: 14, fontWeight: "700", color: "#555" },
+  flex: { flex: 1 },
 });

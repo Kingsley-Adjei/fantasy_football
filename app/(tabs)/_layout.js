@@ -1,14 +1,14 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../src/constants/colors";
+// Note: If COLORS.primary isn't defined yet, I'll use the FPL Purple (#37003C)
+const PRIMARY_COLOR = "#37003C";
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: COLORS.primary,
+        tabBarActiveTintColor: "#00FF85", // FPL Green for active
         tabBarInactiveTintColor: "gray",
-        // This removes the white bar at the top of ALL screens
         headerShown: false,
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
@@ -17,8 +17,6 @@ export default function TabsLayout() {
           height: 65,
           paddingBottom: 10,
           paddingTop: 5,
-          elevation: 0, // Removes shadow on Android
-          shadowOpacity: 0, // Removes shadow on iOS
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -26,31 +24,39 @@ export default function TabsLayout() {
         },
       }}
     >
-      {/* 1. Setup Squad - Hidden from tab bar if you prefer, or kept as a start point */}
-      <Tabs.Screen
-        name="create-team"
-        options={{
-          title: "Setup",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="football" size={size} color={color} />
-          ),
-          // If you want to hide this tab completely once the team is made,
-          // you can dynamically set href: null here later.
-        }}
-      />
+      {/* Hide the index if it exists but isn't used */}
+      <Tabs.Screen name="index" options={{ href: null }} />
 
-      {/* 2. My Team - The Main Dashboard */}
       <Tabs.Screen
         name="my-team"
         options={{
           title: "My Team",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
+            <Ionicons name="shirt" size={size} color={color} />
           ),
         }}
       />
 
-      {/* 3. Profile */}
+      <Tabs.Screen
+        name="leagues" // This matches your leagues.js file name
+        options={{
+          title: "Leagues",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trophy" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="create-team"
+        options={{
+          title: "Setup",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="add-circle" size={size} color={color} />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="profile"
         options={{
@@ -61,13 +67,7 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* 4. Player Details - Route accessible but no button in bottom bar */}
-      <Tabs.Screen
-        name="player-details"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="player-details" options={{ href: null }} />
     </Tabs>
   );
 }

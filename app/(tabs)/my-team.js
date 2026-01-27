@@ -10,6 +10,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Animated,
 } from "react-native";
 import { POSITIONS, sortPlayersFPLStyle } from "../../src/constants/positions";
 import { MOCK_PLAYERS } from "../../src/services/api";
@@ -297,6 +298,9 @@ const PlayerProfileModal = ({
 };
 
 export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
+  const [sessionSquad, setSessionSquad] = useState(MOCK_SQUAD);
+  const [pendingTransfers, setPendingTransfers] = useState([]);
+
   const [selectedPlayerProfile, setSelectedPlayerProfile] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
@@ -434,6 +438,7 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
   };
 
   const handleSelectIn = (player) => {
+    // 1. Check Budget FIRST before changing anything
     const priceDiff = player.price - playerToTransferOut.price;
     if (priceDiff > budget) {
       Alert.alert(
@@ -442,9 +447,12 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
       );
       return;
     }
+
+    // 2. Check Club Limit
     const clubCount = squad.filter(
       (p) => p.realClub === player.realClub && p.id !== playerToTransferOut.id
     ).length;
+
     if (clubCount >= 3) {
       Alert.alert(
         "Club Limit",
@@ -452,8 +460,23 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
       );
       return;
     }
-    setPlayerToTransferIn(player);
+
+    // 3. Update the Squad (Visual change)
+    const updatedSquad = squad.map((p) =>
+      p.id === playerToTransferOut.id ? player : p
+    );
+    setSquad(updatedSquad); // Use the function call ()
+
+    // 4. Track the Pending Transfer for the "Salah Loophole" logic
+    setPendingTransfers([
+      ...pendingTransfers,
+      { out: playerToTransferOut, in: player },
+    ]);
+
+    // 5. Update Budget & UI
+    setBudget((prev) => prev - priceDiff);
     setShowPlayerList(false);
+    setHasChanges(true);
   };
 
   const executeTransfer = () => {
@@ -578,10 +601,16 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
             <Text style={styles.headerTitle}>Pick Team</Text>
 
             <View style={styles.headerButtonGroup}>
-              {(hasChanges || playerToTransferOut) && (
+              {/* REVERT BUTTON */}
+              {(hasChanges || pendingTransfers.length > 0) && (
                 <TouchableOpacity
-                  style={[styles.saveBtn || { backgroundColor: "#EEE" }]}
-                  onPress={handleRevertChanges}
+                  style={[styles.revertBtn, { backgroundColor: "#EEE" }]}
+                  onPress={() => {
+                    setSquad(sessionSquad); // Now it only runs on click
+                    setPendingTransfers([]); // Clear the "shopping cart"
+                    setHasChanges(false);
+                    setBudget(1.1); // Reset to your starting budget
+                  }}
                 >
                   <Text style={[styles.saveBtnText, { color: "#666" }]}>
                     Revert
@@ -589,14 +618,26 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
                 </TouchableOpacity>
               )}
 
-              {(hasChanges || (playerToTransferOut && playerToTransferIn)) && (
+              {/* SAVE BUTTON */}
+              {(hasChanges || pendingTransfers.length > 0) && (
                 <TouchableOpacity
-                  style={styles.saveBtn}
-                  onPress={() =>
-                    mode === "team"
-                      ? (Alert.alert("Saved!"), setHasChanges(false))
-                      : executeTransfer()
-                  }
+                  style={styles.saveBtnAction}
+                  onPress={() => {
+                    if (mode === "team") {
+                      setSessionSquad(squad); // Make the current team the new baseline
+                      setHasChanges(false);
+                      Alert.alert("Saved!", "Team selection updated.");
+                    } else {
+                      // TRANSFER MODE SAVE
+                      setSessionSquad(squad); // Lock in the transfers
+                      setPendingTransfers([]); // Clear pending list
+                      setHasChanges(false);
+                      Alert.alert(
+                        "Transfers Confirmed!",
+                        "Points will be deducted if applicable."
+                      );
+                    }
+                  }}
                 >
                   <Text style={styles.saveBtnText}>Save</Text>
                 </TouchableOpacity>
@@ -698,22 +739,22 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
           <View style={styles.pitchContent}>
             <View style={styles.row}>
               {pitchRows.GKP.map((p) => (
-                <PlayerSlot key={p.id} player={p} />
+                <PlayerSlot key={p.id} player={p} isBench={false} />
               ))}
             </View>
             <View style={styles.row}>
               {pitchRows.DEF.map((p) => (
-                <PlayerSlot key={p.id} player={p} />
+                <PlayerSlot key={p.id} player={p} isBench={false} />
               ))}
             </View>
             <View style={styles.row}>
               {pitchRows.MID.map((p) => (
-                <PlayerSlot key={p.id} player={p} />
+                <PlayerSlot key={p.id} player={p} isBench={false} />
               ))}
             </View>
             <View style={styles.row}>
               {pitchRows.FWD.map((p) => (
-                <PlayerSlot key={p.id} player={p} />
+                <PlayerSlot key={p.id} player={p} isBench={false} />
               ))}
             </View>
           </View>
@@ -739,7 +780,11 @@ export default function MyTeamScreen({ selectedPlayers = MOCK_SQUAD }) {
           </View>
           <View style={styles.subRow}>
             {bench.map((p, index) => (
-              <PlayerSlot key={`bench-${p.id}-${index}`} player={p} />
+              <PlayerSlot
+                key={`bench-${p.id}-${index}`}
+                player={p}
+                isBench={true}
+              />
             ))}
           </View>
         </View>
